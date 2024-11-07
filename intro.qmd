@@ -1,4 +1,4 @@
-# Introduction {#sec-intro}
+# 引言 {#sec-intro}
 
 ```{r}
 #| label: setup-common-01
@@ -17,16 +17,16 @@ if (!identical(Sys.getenv("emlwr.eval_fits"), "true")) {
 ```
 
 ::: callout-note
-While this chapter is an early draft, it's relatively complete and should be coherent for readers.
+虽然这一章是早期草稿，但它相对完整，对读者来说应该是连贯的。
 :::
 
-## Demonstration {#sec-demonstration}
+## 演示 {#sec-demonstration}
 
-To demonstrate the massive impact that a few small pieces of intuition can have on execution time when evaluating machine learning models, I'll run through a quick model tuning example. On the first go, I'll lean on tidymodels' default values and a simple grid search, and on the second, I'll pull a few tricks out from my sleeves that will drastically reduce the time to evaluate models while only negligibly decreasing predictive performance.
+为了展示一些小小的直觉对评估机器学习模型时执行时间的巨大影响，我将通过一个快速的模型调优示例来说明。在第一次尝试中，我将依赖tidymodels的默认值和一个简单的网格搜索，在第二次尝试中，我将从我的袖子里拿出一些技巧，这些技巧将在几乎不降低预测性能的情况下大幅减少评估模型所需的时间。
 
-### Setup {#sec-setup}
+### 设置 {#sec-setup}
 
-First, loading a few needed packages:
+首先，加载一些需要的包：
 
 ```{r}
 #| label: load-pkgs
@@ -36,7 +36,7 @@ library(finetune)
 library(bonsai)
 ```
 
-For the purposes of this example, we'll simulate a data set of 100,000 rows and 18 columns. The first column, `class`, is a binary outcome, and the remaining variables are a mix of numerics and factors.
+为了这个示例，我们将模拟一个包含100,000行和18列的数据集。第一列`class`是一个二元结果，其余变量是数字和因子的混合。
 
 ```{r}
 #| label: d-print
@@ -45,9 +45,9 @@ d <- simulate_classification(1e5)
 d
 ```
 
-See @sec-datasets for more information on this dataset.
+有关这个数据集的更多信息，请参见@sec-datasets。
 
-We'll first split the data into training and testing sets before generating a set of 10 folds from the training data for cross-validation.
+我们将首先将数据分割为训练集和测试集，然后从训练数据生成10个折叠用于交叉验证。
 
 ```{r}
 #| label: d-split
@@ -58,9 +58,9 @@ d_test <- testing(d_split)
 d_folds <- vfold_cv(d_train)
 ```
 
-### A first go {#sec-first-go}
+### 第一次尝试 {#sec-first-go}
 
-For my first go at tuning, I'll tune a boosted tree model using grid search. By default, tidymodels will use XGBoost as the modeling engine. I'll try out a few different values for `learn_rate`—a parameter that controls how drastically newly added trees impact predictions—and `trees`—the number of trees in the ensemble.
+在我第一次尝试调优时，我将使用网格搜索来调整一个提升树模型。默认情况下，tidymodels将使用XGBoost作为建模引擎。我将尝试几个不同的`learn_rate`值——一个控制新添加的树对预测影响程度的参数——以及`trees`——集成中树的数量。
 
 ```{r}
 #| label: bt
@@ -69,7 +69,7 @@ bt <-
   set_mode("classification")
 ```
 
-I'll carry out a grid search using `tune_grid()`, trying out a bunch of different pairs of values for `learn_rate` and `trees` and seeing what sticks. The argument `grid = 12` indicates that I want to try out 12 different combinations of values and will let tidymodels take care of exactly what those values are.
+我将使用`tune_grid()`进行网格搜索，尝试`learn_rate`和`trees`的不同值对，并看看哪些有效。参数`grid = 12`表示我想尝试12种不同的值组合，并将让tidymodels确切地决定这些值是什么。
 
 ```{r}
 #| label: bm-basic
@@ -99,34 +99,34 @@ if (identical(eval_fits, "true")) {
 }
 ```
 
-`bench::mark()` returns, among other things, a precise timing of how long this process takes.
+`bench::mark()`返回了这个过程所需的精确时间。
 
 ```{r}
 #| label: bm-basic-print
 bm_basic
 ```
 
-Holy smokes! `r round(as.numeric(bm_basic$median[[1]]) / 60 / 60, 2)` hours is a good while. What all did `tune_grid()` do, though? First, let's break down how many model fits actually happened. Since I've supplied `grid = 12`, we're evaluating 12 possible model configurations. Each of those model configurations is evaluated against `d_folds`, a `r nrow(d_folds)`-fold cross validation object, meaning that each configuration is fitted `r nrow(d_folds)` times. That's `r nrow(d_folds) * 12` model fits! Further, consider that those fits happen on `r nrow(d_folds)-1`/`r nrow(d_folds)`ths of the training data, or `r nrow(d_folds$splits[[1]])` rows.
+天哪！`r round(as.numeric(bm_basic$median[[1]]) / 60 / 60, 2)`小时是相当长的一段时间。不过，`tune_grid()`到底做了什么呢？首先，我们来分解一下实际发生了多少次模型拟合。由于我提供了`grid = 12`，我们正在评估12种可能的模型配置。这些模型配置中的每一种都针对`d_folds`进行评估，这是一个`r nrow(d_folds)`折交叉验证对象，这意味着每种配置都拟合了`r nrow(d_folds)`次。那是`r nrow(d_folds) * 12`次模型拟合！此外，这些拟合发生在`r nrow(d_folds)-1`/`r nrow(d_folds)`的训练数据上，或者`r nrow(d_folds$splits[[1]])`行。
 
-With a couple small changes, though, the time to tune this model can be *drastically* decreased.
+然而，通过一些小的改动，调整这个模型所需的时间可以被*大幅*减少。
 
-### A speedy go {#sec-speedy-go}
+### 快速尝试 {#sec-speedy-go}
 
-To cut down on the time to evaluate these models, I'll make 4 small modifications that require something like 7 lines of code.
+为了减少评估这些模型所需的时间，我将进行4个小修改，这些修改只需要大约7行代码。
 
-First, I'll **evaluate in parallel**: Almost all modern laptops have more than one CPU core, and distributing computations across them only takes 1 line of code with tidymodels.
+首先，我将**并行评估**：几乎所有现代笔记本电脑都有不止一个CPU核心，并且只需要1行代码就可以使用tidymodels在它们之间分配计算。
 
 ```{r}
 plan(multisession, workers = 4)
 ```
 
-While this tuning process could benefit from distributing across many more cores than 4, I'll just use 4 here to give a realistic picture of the kinds of speedups possible on a typical laptop.
+虽然这个调优过程可以从更多的核心中受益，但我只在这里使用4个核心，以给出在典型笔记本电脑上可能的速度提升的真实画面。
 
 ::: callout-note
-Parallelism is the subject of @sec-parallel-computing.
+并行性是@sec-parallel-computing的主题。
 :::
 
-Then, we'll **use a clever grid**; the tidymodels framework enables something called the "submodel trick," a technique that will allow us to predict from many more models than we actually fit. Instead of just supplying `grid = 12` and letting tidymodels generate the grid automatically, I'll construct the grid myself.
+然后，我们将**使用一个巧妙的网格**；tidymodels框架实现了一种称为“子模型技巧”的技术，这将允许我们从比实际拟合的模型更多的模型中进行预测。而不是只提供`grid = 12`并让tidymodels自动生成网格，我将自己构建网格。
 
 ```{r}
 set.seed(1)
@@ -136,20 +136,20 @@ bt_grid <- bt %>%
 ```
 
 ::: callout-note
-To learn more about the submodel trick, see @sec-submodel.
+要了解更多关于子模型技巧的信息，请参见@sec-submodel。
 :::
 
-Next, I'll **switch out the computational engine**: Substituting XGBoost with another gradient-boosting model that can better handle some properties of this dataset will cut down on our fit time by a good bit.
+接下来，我将**更换计算引擎**：用另一种能够更好地处理数据集某些属性的梯度提升模型替换XGBoost，将大大减少我们的拟合时间。
 
 ```{r}
 bt_lgb <- bt %>% set_engine("lightgbm")
 ```
 
 ::: callout-note
-@sec-models contains benchmarks and notes on the scaling properties of many of the modeling engines supported by tidymodels.
+@sec-models包含了tidymodels支持的许多建模引擎的基准测试和扩展属性的注释。
 :::
 
-Finally, I'll **give up early on poorly-performing models**: Rather than using grid search with `tune_grid()`, I'll use a technique called *racing* that stops evaluating models when they seem to be performing poorly using the `tune_race_anova()` function.
+最后，我将**提前放弃表现不佳的模型**：而不是使用`tune_grid()`进行网格搜索，我将使用一种称为*racing*的技术，当模型表现不佳时停止评估模型，使用`tune_race_anova()`函数。
 
 ```{r}
 #| label: bm-speedy
@@ -180,10 +180,10 @@ if (identical(eval_fits, "true")) {
 ```
 
 ::: callout-note
-Alternative search strategies like racing are covered in detail in @sec-search.
+替代搜索策略如racing在@sec-search中有详细说明。
 :::
 
-Checking out the new benchmarks:
+查看新的基准测试：
 
 ```{r}
 #| label: bm-speedy-print
@@ -196,9 +196,9 @@ bm_speedy
 plan("default")
 ```
 
-The total time to tune was reduced from `r round(as.numeric(bm_basic$median[[1]]) / 60 / 60, 2)` *hours* to `r round(as.numeric(bm_speedy$median[[1]]) / 60, 2)` *minutes*—the second approach was `r round(as.numeric(bm_basic[["median"]][[1]]) / as.numeric(bm_speedy[["median"]][[1]]))` times faster than the first.
+调整总时间从`r round(as.numeric(bm_basic$median[[1]]) / 60 / 60, 2)`*小时*减少到`r round(as.numeric(bm_speedy$median[[1]]) / 60, 2)`*分钟*——第二种方法比第一种快了`r round(as.numeric(bm_basic[["median"]][[1]]) / as.numeric(bm_speedy[["median"]][[1]]))`倍。
 
-The first thing I'd wonder when seeing this result is how much of a penalty in predictive performance I'd suffer due to this transition. Let's evaluate both of the top models from these tuning results on the test set. First, for the basic workflow:
+看到这样的结果时，我首先会想，由于这种转变，我会在预测性能上受到多大的惩罚。让我们在测试集上评估这些调优结果中的顶级模型。首先，对于基本工作流程：
 
 ```{r}
 #| label: fit-basic
@@ -224,7 +224,7 @@ if (identical(eval_fits, "true")) {
 collect_metrics(fit_basic)
 ```
 
-As for the quicker approach:
+至于更快的方法：
 
 ```{r}
 #| label: fit-speedy
@@ -250,71 +250,65 @@ if (identical(eval_fits, "true")) {
 collect_metrics(fit_speedy)
 ```
 
-Virtually indistinguishable performance results in `r round(100 * as.numeric(bm_speedy[["median"]][[1]]) / as.numeric(bm_basic[["median"]][[1]]), 1)`% of the time.
+性能结果几乎无法区分，在时间上仅用了`r round(100 * as.numeric(bm_speedy[["median"]][[1]]) / as.numeric(bm_basic[["median"]][[1]]), 1)`%。
 
-## Our approach
+## 我们的方法
 
-This book is intended for tidymodels users who have been waiting too long for their code to run. I generally assume that users are familiar with data manipulation and visualization with the tidyverse as well as the basics of machine learning with tidymodels, like evaluating models against resamples using performance metrics. For the former, I recommend [@wickham2023] for getting up to speed—for the latter, [@kuhn2022]. If you're generally comfortable with the content in those books, you're ready to go.
+这本书是为那些等待代码运行时间过长的tidymodels用户准备的。我通常假设用户已经熟悉使用tidyverse进行数据操作和可视化，以及使用tidymodels进行基础机器学习知识，比如使用性能指标对重新抽样的模型进行评估。对于前者，我推荐[@wickham2023]来提高速度——对于后者，[@kuhn2022]。如果你对这些书中的内容感到舒适，那你就准备好了。
 
-Modern laptops are remarkable. Users of tidymodels working on many machines made in the last few years are well-prepared to interactively develop machine learning models based on tens of millions of rows of data. That said, without the right information, it's quite easy to mistakenly introduce performance issues that result in analyses on even tens of thousands of rows of data becoming too cumbersome to work with. Generally, the tidymodels framework attempts to guard users from making such mistakes and addressing them ourselves when they're in our control. At the same time, many foundational and well-used approaches in classical machine learning have well-theorized adaptations that substantially cut down on the elapsed time while preserving predictive performance. The tidymodels framework implements many such adaptations and this book aims to surface them in a holistic and coherent way. Readers will come out of having read this book with a grab bag of one-liners that can cut down on elapsed time to develop machine learning models by orders of magnitude.
+现代笔记本电脑是了不起的。在过去几年制造的许多机器上使用tidymodels的用户，已经准备好基于数千万行数据交互式地开发机器学习模型。话虽如此，如果没有正确的信息，很容易错误地引入性能问题，导致即使是数万行数据的分析也变得难以处理。通常，tidymodels框架试图保护用户免犯这样的错误，并在我们控制范围内解决这些问题。同时，许多经典机器学习中的基础和常用方法都有理论上的改进，可以大幅减少经过时间，同时保持预测性能。tidymodels框架实现了许多这样的改进，这本书的目标是以全面和连贯的方式展示它们。读者在阅读这本书后，将获得一系列一行代码，这些代码可以减少开发机器学习模型所需的时间，数量级上减少。
 
-<!-- ## The cost of slowness -->
+## 难点
 
-<!-- All of this said, R is not known for its computational efficiency. If I really prioritize that, why am I writing a book about R? -->
+为了更好地理解如何减少使用tidymodels评估模型所需的时间，我们需要了解tidymodels的工作原理。
 
-<!-- (i use R for many reasons. you evidently do, too. it is true that many modeling engines only implement some performance optimizations / hardware accelators for their python interfaces—at the same time, modeling engines in R are often interfaces to the same compiled code as that used from python.) <!--#  -->
+像许多其他机器学习的“统一框架”（mlr3、caret、scikit-learn（？））一样，tidymodels框架本身并不实现训练和预测模型的算法。相反，tidymodels提供了一个通用接口到建模*引擎*：提供`fit()`和`predict()`方法的包（或包中的函数）。
 
-## The hard part
+![一张代表使用tidymodels拟合机器学习模型所需时间的图表。中央部分，以绿色显示，代表建模引擎拟合或预测模型算法所需的时间。绿色部分，在建模引擎的两侧，代表tidymodels的“开销”。](figures/translate_diagram.png){#fig-fit-boost-tree fig-alt="一个由三部分组成的时间线图表，分别以绿色、橙色和绿色显示。第一部分标记为“将输入转换为引擎代码”，第二部分为“调用引擎代码”，第三部分为“转换引擎输出”。时间线上方是需要使用tidymodels拟合提升树的代码。" fig-align="center"}
 
-To better understand how to cut down on the time to evaluate models with tidymodels, we need to understand a bit about how tidymodels works.
+当使用tidymodels进行拟合和预测时，“翻译”过程在@fig-fit-boost-tree中有所说明。一些代码运行所需的时间是由于将输入的统一代码“翻译”成引擎期望的特定语法，还有一些部分是由于将引擎返回的内容“翻译”成tidymodels返回的统一输出；这些部分都在tidymodels团队的控制范围内。其余的时间发生在建模引擎的代码内部。
 
-Like many other "unifying frameworks" for ML (mlr3, caret, scikit-learn(?)), the tidymodels framework itself does not implement the algorithms to train and predict from models. Instead, tidymodels provides a common interface to modeling *engines*: packages (or functions from packages) that provide the methods to `fit()` and `predict()`.
+在tidymodels团队控制范围内的时间部分以绿色显示，我将在这本书中称之为“开销”。与训练数据的大小相比，tidymodels的开销在时间上是相对恒定的。这个开销包括检查数据类型、处理错误和警告等任务——最重要的是——以编程方式组装对引擎函数的调用。
 
-![A diagram representing portions of the elapsed time to fit a machine learning model with tidymodels. The central portion, shown in green, represents the time required by the modeling engine to fit or predict the model algorithm. The portions in green, on either side of the modeling engine, represent tidymodels' "overhead."](figures/translate_diagram.png){#fig-fit-boost-tree fig-alt="A timeline-ish diagram consisting of three portions in green, orange, and green again. The first portion is labeled \"translate input to engine code,\" the second \"call engine code,\" the third \"translate engine output.\" Above the timeline is the code required to fit a boosted tree with tidymodels." fig-align="center"}
-
-The process of "translating" between the tidymodels and engine formats is illustrated in @fig-fit-boost-tree. When fitting and predicting with tidymodels, some portion of the elapsed time to run code is due to the "translation" of the inputted unified code to the specific syntax that the engine expects, and some portion of it is due to the translation of what the engine returns to the unified output returned by tidymodels; these portions are in the tidymodels team's control. The rest of the elapsed time occurs inside of the modeling engine's code.
-
-The portions of the elapsed time that are in the tidymodels team's control are shown in green, and I'll refer to them in this book as "overhead." The overhead of tidymodels in terms of elapsed time is relatively constant with respect to the size of training data. This overhead consists of tasks like checking data types, handling errors and warnings, and—most importantly—programmatically assembling calls to engine functions.
-
-The portion of the elapsed time shown in orange represents the actual training of (or predicting from) the model. This portion is implemented by the modeling *engine* and is thus not in the tidymodels team's control. In contrast to overhead, the elapsed time of this code is very much sensitive to the size of the inputted data; depending on the engine, increases in the number of rows or columns of training or testing data may drastically increase the time to train or predict from a given model.
+以橙色显示的时间部分代表实际的模型训练（或预测）。这部分由建模*引擎*实现，因此不在tidymodels团队的控制范围内。与开销相比，这段代码的经过时间非常受输入数据大小的影响；根据引擎的不同，训练或测试数据的行数或列数的增加可能会大幅增加给定模型的训练或预测时间。
 
 ::: callout-note
-The algorithmic complexity of the models implemented by these engines is well-understood in many cases. At the same time, the behavior of elapsed time for some engine implementations often differs greatly from what theory would lead one to believe. Regressions in modeling code may introduce undue slowdowns and, conversely, performance optimizations that lead to elapsed times that scale better than theory would suggest may be the very reason for the existence of some engines.
+这些引擎实现的模型的算法复杂性在许多情况下都是众所周知的。同时，一些引擎实现的经过时间的行为往往与理论预测大相径庭。模型代码的回归可能会引入不当的减速，反之，性能优化可能导致经过时间比理论预测更好地扩展，这可能是某些引擎存在的原因。
 :::
 
-As shown in @fig-fit-scale, the proportion of elapsed time that overhead is responsible for depends on how quickly the engine can fit or predict for a given dataset.
+如@fig-fit-scale所示，开销负责的经过时间比例取决于引擎对给定数据集的拟合或预测速度。
 
-![As a proportion, tidymodels' overhead is a function of how long an engine takes to fit. For a very simple fit on a small dataset, tidymodels overhead is quite substantial, but for even moderately complex model fits and/or moderately large data, the proportion overhead is negligible.](figures/scaling_diagram.png){#fig-fit-scale fig-alt="A diagram similar to the one from above, except three of them are stacked on top of each other. The length of the green portions is the same in each of the diagrams, but the orange portions are either very small, moderate, or long."}
+![作为比例，tidymodels的开销是引擎拟合时间的函数。对于小数据集上的非常简单的拟合，tidymodels开销相当可观，但对于即使是中等复杂的模型拟合和/或中等大小的数据，开销的比例可以忽略不计。](figures/scaling_diagram.png){#fig-fit-scale fig-alt="与上图类似的图表，只是三个图表堆叠在一起。绿色部分的长度在每个图表中都是相同的，但橙色部分要么非常小，中等，要么很长。"}
 
-Since the absolute overhead of tidymodels' translation is relatively constant, overhead is only a substantial portion of elapsed time when models fit or predict *very* quickly. For a linear model fitted on 30 data points with `lm()`, this overhead is [continuously benchmarked](https://github.com/tidymodels/parsnip/blob/11a3ab942f131e9d612d4d37c4b77273be064aaf/tests/testthat/test_fit_interfaces.R#L171) to remain under 2/3. That is, absolute worst-case, fitting a model with tidymodels takes three times longer than using the engine interface itself. However, this overhead approaches fractions of a percent for fits on even 10,000 rows for many engines. Thus, a focus on reducing the elapsed time of overhead is valuable in the sense that the framework ought not to unintentionally introduce regressions that cause overhead to scale with the size of training data, but in general, the hard part of reducing elapsed time when evaluating models is reducing the elapsed time for computations carried out by the modeling engine.
+由于tidymodels翻译的绝对开销相对恒定，当模型拟合或预测*非常*快时，开销才是经过时间的很大一部分。对于使用`lm()`拟合30个数据点的线性模型，这个开销是[持续基准测试](https://github.com/tidymodels/parsnip/blob/11a3ab942f131e9d612d4d37c4b77273be064aaf/tests/testthat/test_fit_interfaces.R#L171)保持在2/3以下。也就是说，在最坏的情况下，使用tidymodels拟合模型比使用引擎接口本身多花三倍时间。然而，对于许多引擎来说，这个开销对于即使是10,000行的拟合也是微不足道的百分比。因此，关注减少开销的经过时间是有价值的，因为框架不应该无意中引入导致开销随训练数据大小而扩展的回归，但总的来说，减少评估模型时的经过时间的难点在于减少建模引擎执行的计算时间。
 
-The next question is then *how could tidymodels cut down on elapsed time for modeling engines that it doesn't own?* To answer this question, let's revisit the applied example from @sec-first-go. In that first example, the code does some translation to the engine's syntax, sets up some error handling, and then fits and predicts from `r nrow(d_folds) * 12` models.
+接下来的问题则是*tidymodels如何减少它不拥有的建模引擎的经过时间？*为了回答这个问题，让我们重新审视@sec-first-go中的应用示例。在那个第一个示例中，代码对引擎的语法进行了一些翻译，设置了一些错误处理，然后拟合和预测了`r nrow(d_folds) * 12`个模型。
 
-![A depiction of the timeline when tuning a model with tidymodels. The one, central orange segment representing engine code is now 120 individual segments, one for each model fit.](figures/basic_resample.png){#fig-basic-resample fig-alt="A similar diagram to the first, except that the middle orange portion is now cut up into 120 portions. When resampling models with tidymodels, the translation steps only need to happen once, and then the engine code is called for every data subset and hyperparameter combination."}
+![使用tidymodels调优模型时的时间线图。现在，代表引擎代码的一个中央橙色部分变成了120个单独的部分，每个模型拟合一个。](figures/basic_resample.png){#fig-basic-resample fig-alt="与第一个图表类似，只是中间的橙色部分现在被分成了120个部分。当使用tidymodels重新抽样模型时，翻译步骤只需要发生一次，然后引擎代码针对每个数据子集和超参数组合被调用。"}
 
-@fig-basic-resample depicts this process, where we evaluate all `r nrow(d_folds) * 12` models in order. Each white dot in the engine portion of the elapsed time represents another round of fitting and predicting with engine. Remember that in reality, for even modest dataset sizes, the green portions representing tidymodels overhead are much smaller by proportion than represented.
+@fig-basic-resample描述了这个过程，我们按顺序评估所有`r nrow(d_folds) * 12`个模型。每个白色点在经过时间的引擎部分代表引擎的另一轮拟合和预测。记住，在现实中，对于即使是适度大小的数据集，代表tidymodels开销的绿色部分在比例上比表示的要小得多。
 
-In @sec-speedy-go, the first thing I did was introduce a parallel backend. Distributing engine fits across available cores is itself a gamechanger, as illustrated in @fig-parallel-resample.
+在@sec-speedy-go中，我做的第一件事是引入一个并行后端。在可用核心上分布引擎拟合本身就是一个游戏规则改变者，如@fig-parallel-resample所示。
 
-![Instead of fitting each of the 120 models in sequence, parallelism allows us to concurrently fit as many models as we have CPU cores.](figures/parallel_resample.png){#fig-parallel-resample fig-alt="The same diagram as above, except the portion of the timeline in orange is now split up into 4 segments and \"stacked\" on top of each other. The width of the diagram is 1/4 the size of what it was before."}
+![不是顺序拟合每个120个模型，并行性允许我们同时拟合与我们拥有的CPU核心一样多的模型。](figures/parallel_resample.png){#fig-parallel-resample fig-alt="与上述图表相同，只是橙色部分的时间线现在被分成了4个部分并堆叠在一起。图表的宽度是之前的1/4。"}
 
-Then, switching out computational engines for a more performant alternative further reduces elapsed time, as shown in @fig-parallel-resample-opt.
+然后，更换计算引擎为更高性能的替代品进一步减少了经过时间，如@fig-parallel-resample-opt所示。
 
-![Depending on the modeling context, certain modeling engines can evaluate much more quickly than others.](figures/parallel_resample_opt.png){#fig-parallel-resample-opt fig-alt="The same diagram as above, though now each orange segment is half as wide as it was before. The width of the diagram is now half as wide as it was previously."}
+![根据建模上下文的不同，某些建模引擎比其他引擎评估得更快。](figures/parallel_resample_opt.png){#fig-parallel-resample-opt fig-alt="与上述图表相同，尽管现在每个橙色部分的宽度是之前的一半。图表的宽度现在是之前的一半。"}
 
-Finally, as depicted in @fig-parallel-resample-opt2, the submodel trick described in @sec-submodel and racing described in @sec-search eliminate a substantial portion of the engine fits.
+最后，如@fig-parallel-resample-opt2所示，@sec-submodel中描述的子模型技巧和@sec-search中描述的racing消除了大量的引擎拟合。
 
-![Through racing and the submodel trick, we can evaluate the same number of potential models as before while fitting many fewer models.](figures/parallel_resample_opt2.png){#fig-parallel-resample-opt2 fig-alt="The same diagram as before, except around 2/3 of the orange segments have been removed."}
+![通过racing和子模型技巧，我们可以评估与之前相同数量的潜在模型，同时拟合更少的模型。](figures/parallel_resample_opt2.png){#fig-parallel-resample-opt2 fig-alt="与之前相同的图表，只是大约2/3的橙色部分已被移除。"}
 
-The tidymodels team devotes substantial energy to ensuring support for the most performant parallelization technologies, modeling engines, model-specific optimizations, and search techniques. This book will demonstrate how to best make use of these features to reduce the time needed to evaluate machine learning models.
+tidymodels团队投入大量精力确保支持最性能的并行化技术、建模引擎、模型特定优化和搜索技术。这本书将展示如何最好地利用这些特性来减少评估机器学习模型所需的时间。
 
-## Datasets {#sec-datasets}
+## 数据集 {#sec-datasets}
 
-In @sec-setup, I used a function `simulate_classification()` to generate data. This is one of two functions, the other being `simulate_regression()`, that create the data underlying many of the experiments in this book.
+在@sec-setup中，我使用了一个函数`simulate_classification()`来生成数据。这是两个函数之一，另一个是`simulate_regression()`，它们创建了这本书中许多实验的基础数据。
 
-These two functions are adaptations of their similarly named friends `sim_classification()` and `sim_regression()` from the modeldata package. They make small changes to those function—namely, introducing factor predictors with some tricky distributions—that surface slowdowns with some modeling engines.
+这两个函数是modeldata包中类似命名的`sim_classification()`和`sim_regression()`函数的改编版。它们对那些函数进行了小幅改动——即引入了一些具有棘手分布的因子预测器——这使得一些建模引擎出现了减速。
 
-Provided a number of rows, `sim_classification()` generates a tibble with that many rows and 16 columns:
+给定行数，`sim_classification()`生成一个有相应行数和16列的tibble：
 
 ```{r}
 #| label: print-simulate-classification
@@ -323,9 +317,9 @@ d_class <- simulate_classification(1000)
 d_class
 ```
 
-The leftmost column, `class`, is a binary outcome variable, and the remaining columns are predictor variables. The predictors throw a few curveballs at the modeling functions we'll benchmark in this book.
+最左边的列`class`是二元结果变量，其余列是预测变量。这些预测变量对我们将在本书中基准测试的建模函数提出了一些挑战。
 
-For one, the predictors are moderately correlated. Correlated predictors can lead to unstable parameter estimates and can make the model more sensitive to small changes in the data. Further, correlated predictors may lead to slower convergence in gradient descent processes (like those driving gradient-boosted trees like XGBoost and LightGBM), as the resulting elongated and narrow surface of loss functions causes the algorithm to zigzag towards the optimum value, significantly increasing the training time along the way.
+首先，预测变量之间的相关性适中。相关性高的预测变量可能导致参数估计不稳定，使模型对数据的微小变化更加敏感。此外，相关性高的预测变量可能导致梯度下降过程（如驱动XGBoost和LightGBM等梯度提升树）的收敛速度变慢，因为损失函数的表面变得狭长，导致算法在逼近最优值时出现之字形，从而显著增加了训练时间。
 
 ```{r}
 #| label: correlate-d-class
@@ -336,7 +330,7 @@ correlate(d_class) %>%
   autoplot(low = "#c46938", high = "#3d6c56")
 ```
 
-Secondly, there are a number of factor predictors. Some modeling engines experience slower training times with many factor predictors for a variety of reasons. For one, most modeling engines ultimately implement training routines on numeric matrices, requiring that factor predictors are somehow encoded as numbers. Most often in R, this is in the form of treatment contrasts, where an $n$-length factor with $l$ levels is represented as an $n ~x~ l-1$ matrix composed of zeroes and ones. Each column is referred to as a dummy variable. The first column has value $1$ when the $i$-th entry of the factor is the second level, zero otherwise. The second column has value $1$ when the $i$-th entry of the factor is the third level, zero otherwise. We know that the $i$-th entry of the first took its first level if all of the entries in the $i$th column of the resulting matrix are zero. While this representation of a factor is relatively straightforward, it's quite memory intensive; a factor with 100 levels ultimately will require a 99-column matrix to be allocated in order to be included in a model. While many modeling engines in R assume that factors will be encoded as treatment contrasts, different modeling engines have different approaches to processing factor variables, some more efficient than others. More on this in @sec-sparsity, in particular.
+其次，有一些因子预测变量。由于多种原因，许多建模引擎在处理许多因子预测变量时训练时间会变长。首先，大多数建模引擎最终在数值矩阵上实现训练程序，要求因子预测变量以某种方式被编码为数字。在R中，这通常以处理对比的形式出现，其中长度为$n$的因子如果有$l$个水平，就被表示为一个由零和一组成的$n ~x~ l-1$矩阵。每一列被称为一个虚拟变量。当因子的第$i$个条目是第二水平时，第一列的值为$1$，否则为零。当因子的第$i$个条目是第三水平时，第二列的值为$1$，否则为零。如果结果矩阵的第$i$列的所有条目都为零，则我们知道第一个因子的第$i$个条目取的是第一水平。虽然这种因子表示方法相对简单，但它非常耗费内存；一个有100个水平的因子最终将需要一个99列的矩阵被分配以便被包含在模型中。虽然许多R中的建模引擎假设因子将被编码为处理对比，但不同的建模引擎对处理因子变量有不同的方法，其中一些比其他的更有效。更多内容见@sec-sparsity。
 
 ```{r}
 #| label: represent-factors-as-dummy
@@ -347,7 +341,7 @@ mm <- as.data.frame(model.matrix(~x, df))[-1]
 
 :::::: columns
 ::: {.column width="45%"}
-Original factor
+原始因子
 
 ```{r, echo = FALSE}
 df
@@ -355,11 +349,11 @@ df
 :::
 
 ::: {.column width="10%"}
-<!-- empty column to create gap -->
+<!-- 空列以创建间隙 -->
 :::
 
 ::: {.column width="45%"}
-Factor with treatment contrasts
+处理对比的因子
 
 ```{r, echo = FALSE}
 mm
@@ -367,13 +361,13 @@ mm
 :::
 ::::::
 
-Further, many of those factor variables have a class imbalance; that is, some levels of the factor occur much more often than others. Some models may struggle to learn from the less frequently-occurring classes, potentially requiring more iterations of descent processes for some models to converge. Even when this is not the case, it may be varyingly "worth it" in terms of memory usage to allocate a dummy variable to a factor level that only appears a couple times in a dataset with many rows.
+此外，许多这些因子变量存在类别不平衡；也就是说，因子的一些水平出现的频率远高于其他水平。一些模型可能难以从出现频率较低的类别中学习，可能需要更多的下降过程迭代才能使一些模型收敛。即使情况并非如此，在内存使用方面，为在许多行的数据集中只出现几次的因子水平分配一个虚拟变量也可能是“值得的”。
 
 ```{r}
 #| label: factors-d-class
 #| echo: false
-#| fig-cap: "Distributions of the categorical variables in the simulated data. While factor levels are well-balanced in the outcome `class`, some factor levels are much more common than others in the predictors, which can lead to instability in many modeling algorithms."
-#| fig-alt: "5 bar charts, faceted on top of each other. Each row represents a factor column in the data d, and each column gives a count of observations of each level of the column. The outcome `class` is relatively well-balanced, while each of the predictors have significant class imbalances."
+#| fig-cap: "模拟数据中分类变量的分布。虽然结果`class`中的因子水平平衡得很好，但预测器中的一些因子水平比其他水平更常见，这可能导致许多建模算法不稳定。"
+#| fig-alt: "5个条形图，一个接一个地堆叠在一起。每一行代表数据d中的一个因子列，每一列给出每个列水平的观测计数。结果`class`相对平衡，而每个预测器都有显著的类别不平衡。"
 d_class %>%
   select(where(is.factor)) %>%
   summarize(across(everything(), ~list(table(.x)))) %>%
@@ -393,12 +387,12 @@ d_class %>%
   geom_col() +
   facet_grid(rows = vars(variable)) +
   theme_minimal() +
-  labs(x = "Factor Level", y = "Number of Observations")
+  labs(x = "因子水平", y = "观测次数")
 ```
 
-<!--# TODO: is it possible to remove the panel grid in the rows/cols that don't apply? -->
+<!--# TODO: 是否有可能在不适用的行/列中移除面板网格？ -->
 
-The regression dataset looks quite similar.
+回归数据集看起来非常相似。
 
 ```{r}
 #| label: print-simulate-regression
@@ -407,6 +401,7 @@ d_reg <- simulate_regression(1000)
 d_reg
 ```
 
-The left-most column, `outcome`, is a numeric outcome, and the remaining 15 columns are a mix of numeric and factor. The same story related to correlation and tricky factor imbalances goes for the regression dataset. Demonstrating that is homework.
+最左边的列`outcome`是数值结果，其余15列是数值和因子的混合。与相关性和棘手的因子不平衡相关的故事也适用于回归数据集。证明这一点是家庭作业。
 
-<!--# todo: this isn't "real" data -->
+<!--# todo: 这不是“真实”的数据 -->
+
