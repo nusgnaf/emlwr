@@ -1,18 +1,19 @@
+```markdown
 ---
 toc: false
 ---
 
-# Welcome🐛 {#sec-welcome .unnumbered}
+# 欢迎🐛 {#sec-welcome .unnumbered}
 
-Welcome to *Efficient Machine Learning with R*! This is a book about predictive modeling with tidymodels, focused on reducing the time and memory required to train machine learning models without sacrificing predictive performance.
+欢迎来到《高效R语言机器学习》！这是一本关于使用tidymodels进行预测建模的书籍，专注于减少训练机器学习模型所需的时间和内存，同时不牺牲预测性能。
 
-This book assumes familiarity with data analysis with the tidyverse as well as the basics of machine learning with tidymodels: fitting models with parsnip, resampling data with rsample, and tuning model parameters with tune. For more on tidy data analysis, see @wickham2023. For the basics of predictive modeling with tidymodels, see @kuhn2022.
+本书假设读者已经熟悉tidyverse的数据分析以及tidymodels的基础机器学习知识：使用parsnip拟合模型，使用rsample重新抽样数据，以及使用tune调整模型参数。有关tidy数据分析的更多信息，请参见@wickham2023。有关tidymodels预测建模的基础知识，请参见@kuhn2022。
 
 ::: callout-caution
-This book is in its early drafting stages; many portions of the book are unfinished and all of it will go through significant revision and refinement. Keep an eye out for callout notes like this one to better understand the state of content you find throughout the site.
+本书目前处于早期起草阶段；书中许多部分尚未完成，所有内容都将经历重大修订和完善。请留意像这样的提示注释，以更好地了解您在整个网站上找到的内容状态。
 :::
 
-## Outline
+## 大纲
 
 ```{r}
 #| include: false
@@ -21,19 +22,19 @@ bm_basic <- qread("data/intro/bm_basic.rds")
 bm_speedy <- qread("data/intro/bm_speedy.rds")
 ```
 
--   @sec-intro demonstrates a `r round(as.numeric(bm_basic[["median"]][[1]]) / as.numeric(bm_speedy[["median"]][[1]]))`-fold speedup with an applied example. By adapting a grid search on a canonical model to use a more performant modeling engine, hooking into a parallel computing framework, transitioning to an optimized search strategy, and defining the grid to search over carefully, the section shows that users can drastically cut down on tuning times without sacrificing predictive performance. The following chapters then explore those optimizations in further details.
+-   @sec-intro 通过一个应用示例展示了一个 `r round(as.numeric(bm_basic[["median"]][[1]]) / as.numeric(bm_speedy[["median"]][[1]]))` 倍的速度提升。通过将规范模型的网格搜索适应到使用更高效的建模引擎，接入并行计算框架，转换到优化的搜索策略，并仔细定义要搜索的网格，本节展示了用户可以在不牺牲预测性能的情况下大幅减少调优时间。接下来的章节将进一步探讨这些优化。
 
--   @sec-models explores timings to resample various different modeling engines. The chapter compares implementations both within and across model types.
+-   @sec-models 探讨了重新抽样不同建模引擎的时间。本章比较了模型类型内部和跨模型类型的实现。
 
-    <!--# should we call out threading here? too early for predictive vs computational performance discussion? -->
+    <!--# 我们应该在这里提到线程吗？对于预测与计算性能讨论来说太早了吗？ -->
 
--   @sec-parallel-computing compares various approaches to distributing model computations across CPU cores. We'll explore two different across-model parallel computing frameworks supported by tidymodels—process forking and socket clusters—and explore their relationship to within-model parallelization.
+-   @sec-parallel-computing 比较了在CPU核心上分布模型计算的各种方法。我们将探索tidymodels支持的两种跨模型并行计算框架——进程分叉和套接字集群——并探讨它们与模型内并行化的关系。
 
--   Then, @sec-search explores various alternatives to grid search that can reduce the total number of model fits required to search a given grid space by only resampling models that seem to have a chance at being the "best."
+-   然后，@sec-search 探讨了各种替代网格搜索的方法，这些方法可以通过只重新抽样那些似乎有机会成为“最佳”的模型来减少搜索给定网格空间所需的模型拟合总数。
 
--   Finally, @sec-submodel investigates approaches to designing grids that can further reduce the total number of model fits required to search a given grid space by generating predictions from one model that can be used to evaluate several.
+-   最后，@sec-submodel 研究了设计网格的方法，这些方法可以通过从一个模型生成预测来进一步减少搜索给定网格空间所需的模型拟合总数，这些预测可以用来评估多个模型。
 
-The optimizations discussed in those aforementioned chapters can, on their own, substantially reduce the time to evaluate machine learning models with tidymodels. Depending on the problem context, some modeling workflows may benefit from more specialized optimizations. The following chapters discuss some of those use cases:
+上述章节中讨论的优化，本身就可以大幅减少使用tidymodels评估机器学习模型的时间。根据问题背景，一些建模工作流程可能从更专业的优化中受益。以下章节讨论了一些这样的用例：
 
 -   @sec-preprocessing
 
