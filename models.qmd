@@ -1,19 +1,19 @@
-# Models {#sec-models}
+# 模型 {#sec-models}
 
-<!--# Going to take some work for this not to feel super rote.  -->
+<!--# 要使这部分内容不显得过于机械，需要做一些工作。 -->
 
-<!--# I do want some kind of content that's, like, tables of timings for every ___ engine fitted on a bunch of numbers of rows.  -->
+<!--# 我希望有一些内容，比如表格，列出在不同行数的数据上拟合每种___引擎的时间。 -->
 
 ::: callout-caution
-This chapter still has a long way to go. I'd recommend exploring other portions of the draft in the meantime.
+本章仍有很长的路要走。在此期间，我建议探索草案的其他部分。
 :::
 
-## Tidymodels overhead
+## Tidymodels开销
 
-<!--# TODO: currently this talks about the difference between CRAN and dev (at the time) packages. rephrase to just focus on the now. -->
+<!--# TODO：当前这部分讨论了CRAN和开发版（dev）包之间的区别。需要重新表述，只关注当前的情况。 -->
 
 \
-<!--# also, need to rewrite to fit when `eval_fits` and not otherwise. -->
+<!--# 另外，需要重写以适应`eval_fits`的情况和不适用的情况。 -->
 
 ```{r}
 #| label: setup-common-02
@@ -37,13 +37,13 @@ if (!eval_fits) {
 }
 ```
 
-While the tidymodels team develops the infrastructure that users interact with directly, under the hood, we send calls out to other people's modeling packages—or modeling *engines*—that provide the actual implementations that estimate parameters, generate predictions, etc. The process looks something like this:
+虽然tidymodels团队开发了用户直接交互的基础设施，但在底层，我们向其他人的建模包或建模*引擎*发送调用——这些引擎提供了估计参数、生成预测等实际实现。这个过程看起来是这样的：
 
-![A graphic representing the tidymodels interface. In order, step 1 "translate", step 2 "call", and step 3 "translate", outline the process of translating from the standardized tidymodels interface to an engine's specific interface, calling the modeling engine, and translating back to the standardized tidymodels interface. Step 1 and step 3 are in green, while step 2 is in orange.](figures/translate_diagram.png)
+![一张图表，代表tidymodels界面。按照顺序，第一步“翻译”，第二步“调用”，第三步“翻译”，概述了从标准化的tidymodels界面翻译到引擎特定界面的过程，调用建模引擎，然后再次翻译回标准化的tidymodels界面。第一步和第三步以绿色显示，而第二步以橙色显示。](figures/translate_diagram.png)
 
-When thinking about the time allotted to each of the three steps above, we refer to the "translate" steps in green as the *tidymodels overhead*. The time it takes to "translate" interfaces in steps **1)** and **3)** is within our control, while the time the modeling engine takes to do it's thing in step **2)** is not.
+当我们考虑上述三个步骤的分配时间时，我们将绿色“翻译”步骤称为*tidymodels开销*。第一步和第三步的“翻译”接口所需的时间在我们的控制之内，而第二步建模引擎所花费的时间则不在。
 
-Let's demonstrate with an example classification problem. Generating some random data:
+让我们用一个示例分类问题来演示。生成一些随机数据：
 
 ```{r}
 #| label: simulate-data
@@ -53,24 +53,24 @@ d <- simulate_classification(n_rows = 100)
 d
 ```
 
-...we'd like to model the `class` using the remainder of the variables in this dataset using a logistic regression. We can using the following code to do so:
+...我们想使用这个数据集中的其余变量来模拟`class`，使用逻辑回归。我们可以使用以下代码来实现：
 
 ```{r}
 #| label: fit-glm
 fit(logistic_reg(), class ~ ., d)
 ```
 
-The default engine for a logistic regression in tidymodels is `stats::glm()`. So, in the style of the above graphic, this code:
+tidymodels中逻辑回归的默认引擎是`stats::glm()`。因此，按照上述图表的风格，这段代码：
 
-1)  Translates the tidymodels code, which is consistent across engines, to the format that is specific to the chosen engine. In this case, there's not a whole lot to do: it passes the preprocessor as `formula`, the data as `data`, and picks a `family` of `stats::binomial`.
-2)  Calls `stats::glm()` and collects its output.
-3)  Translates the output of `stats::glm()` back into a standardized model fit object.
+1) 将tidymodels代码（在引擎之间是一致的）翻译成特定于所选引擎的格式。在这种情况下，没有太多要做的：它将预处理器作为`formula`传递，数据作为`data`，并选择`stats::binomial`的`family`。
+2) 调用`stats::glm()`并收集其输出。
+3) 将`stats::glm()`的输出重新翻译成一个标准化的模型拟合对象。
 
-Again, we can control what happens in steps **1)** and **3)**, but step **2)** belongs to the `stats` package.
+再次强调，我们可以控制第一步和第三步中发生的事情，但第二步属于`stats`包。
 
-The time that steps **1)** and **3)** take is relatively independent of the dimensionality of the training data. That is, regardless of whether we train on one hundred or a million data points, *our* code (as in, the translation) takes about the same time to run. Regardless of training set size, our code pushes around small, relational data structures to determine how to correctly interface with a given engine. The time it takes to run step **2)**, though, depends almost completely on the size of the data. Depending on the modeling engine, modeling 10 times as much data could result in step **2)** taking twice as long, or 10x as long, or 100x as long as the original fit.
+第一步和第三步所花费的时间与训练数据的维度相对独立。也就是说，无论我们是在一个一百还是一百万的数据点上训练，*我们的*代码（即，翻译）运行时间大致相同。无论训练集大小如何，我们的代码都会推动小型的关系数据结构，以确定如何正确地与给定引擎接口。然而，第二步所花费的时间几乎完全取决于数据的大小。根据建模引擎的不同，对10倍的数据进行建模可能会导致第二步的时间是原始拟合的两倍、10倍或100倍。
 
-So, while the *absolute* time allotted to steps **1)** and **3)** is fixed, the *portion* of total time to fit a model with tidymodels that is "overhead" depends on how quick the engine code itself is. How quick is a logistic regression with `glm()` on 100 data points?
+所以，虽然第一步和第三步所分配的*绝对*时间是固定的，但第二步在拟合模型时所占的*部分*时间——即“开销”——取决于引擎代码本身有多快。`glm()`在100个数据点上的逻辑回归有多快？
 
 ```{r}
 #| label: bench-mark-glm
@@ -80,9 +80,9 @@ bench::mark(
   select(expression, median)
 ```
 
-About a millisecond. That means that, if the tidymodels overhead is one second, we've made this model fit a thousand times slower!
+大约一毫秒。这意味着，如果tidymodels开销是一秒钟，我们使这个模型拟合慢了一千倍！
 
-In practice, the overhead here has hovered around a millisecond or two for the last couple years, and machine learning practitioners usually fit much more computationally expensive models than a logistic regression on 100 data points. You'll just have to believe me on that second point. Regarding the first:
+在实践中，这里的开销在过去几年一直在一两毫秒左右，而机器学习从业者通常拟合的模型比100个数据点上的逻辑回归计算成本要高得多。你只需要相信我关于第二点的说法。关于第一点：
 
 ```{r}
 bm_logistic_reg <- 
@@ -93,9 +93,10 @@ bm_logistic_reg <-
   )
 ```
 
-Remember that the first expression calls the second one, so the increase in time from the second to the first is the "overhead." In this case, it's `r as.numeric(bm_logistic_reg$median[1] - bm_logistic_reg$median[2]) * 1000` milliseconds, or `r round(1 - as.numeric(bm_logistic_reg$median[2] / bm_logistic_reg$median[1]), 3) * 100`% of the total elapsed time.
+记住第一个表达式调用了第二个表达式，所以从第二个到第一个的时间增加是“开销”。在这种情况下，它是`r as.numeric(bm_logistic_reg$median[1] - bm_logistic_reg$median[2]) * 1000`毫秒，或者`r round(1 - as.numeric(bm_logistic_reg$median[2] / bm_logistic_reg$median[1]), 3) * 100`%的总经过时间。
 
-So, to fit a boosted tree model on 1,000,000 data points, step **2)** might take a few seconds. Steps **1)** and **3)** don't care about the size of the data, so they still take a few thousandths of a second. No biggie—the overhead is negligible. Let's quickly back that up by fitting boosted tree models on simulated datasets of varying sizes, once with the XGBoost interface and once with parsnip's wrapper around it.
+所以，为了在100万个数据点上拟合一个提升树模型，第二步可能需要几秒钟。第一步和第三步不在乎数据的大小，所以它们仍然需要几千分之一秒。没什么大不了的——开销是微不足道的。让我们通过在不同大小的模拟数据集上拟合提升树模型来快速验证这一点，一次使用XGBoost接口，一次使用parsnip的包装器。
+
 
 ```{r}
 #| echo: false
@@ -148,22 +149,20 @@ press_boost_tree %>%
   labs(x = "Number of Rows", y = "Elapsed Time")
 ```
 
-This graph shows the gist of tidymodels' overhead for modeling engines: as dataset size and model complexity grow larger, model fitting and prediction take up increasingly large proportions of the total evaluation time.
+这张图表展示了tidymodels在建模引擎上的开销概要：随着数据集大小和模型复杂性的增长，模型拟合和预测在总评估时间中所占的比例越来越大。
 
-@sec-speedy-go showed a number of ways users can cut down on the evaluation time of their tidymodels code. Making use of parallelism, reducing the total number of model fits needed to search a given grid, and carefully constructing that grid to search over are all major parts of the story
+@sec-speedy-go展示了用户可以减少他们的tidymodels代码评估时间的多种方法。利用并行计算、减少搜索给定网格所需的模型拟合总数，以及精心构建要搜索的网格，都是故事的主要部分。
 
-<!--# should this chapter go after everything else? -->
+## 基准测试
 
-## Benchmarks
+### 线性模型
 
-### Linear models
+### 决策树
 
-### Decision trees
+### 提升树
 
-### Boosted trees
+XGBoost和LightGBM - 对于从Python接口进行的相同操作的比较时间？
 
-XGBoost and LightGBM – comparison timings for the same thing but from the Python interface?
+### 随机森林
 
-### Random forests
-
-### Support vector machines
+### 支持向量机
